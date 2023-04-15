@@ -34,7 +34,8 @@ async function fetchAllMessages() {
       })
       }
   for (let i = messages.length - 1; i >= 0; i-- ){
-    if (/^[a-zA-Z0-9].*\? I barely know her!/.test(messages[i].content) && jokesList[messages[i].content.toLowerCase()] == undefined ) {
+    if (/^[a-zA-Z0-9].*(er|re|or)\?[ ]?I .* know her!/.test(messages[i].content) &&
+        jokesList[messages[i].content.toLowerCase()] == undefined) {
       // if the message is a joke, add it to the dictionary and assign the user that
       // originally sent that message as the value for a quicker value
       jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
@@ -74,8 +75,7 @@ client.on("messageCreate", function (message) {
     }
   } else {
     try {
-      if (/^[a-zA-Z0-9].*\? I barely know her!/.test(message) ||
-          /^[a-zA-Z0-9].*\? I hardly know her!/.test(message)) {
+    if (/^[a-zA-Z0-9].*(er|re|or)\?[ ]?I .* know her!/.test(message.content)) {
         // if it is in the correct format, respond and increment the count
         if (jokesList[message.content.toLowerCase()] == undefined ) {
           // if we haven't seen this joke before, do the work
