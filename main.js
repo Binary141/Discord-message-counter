@@ -11,6 +11,11 @@ const client = new Client({
 let userList = {}
 let jokesList = {}
 
+function checkRegex(input) {
+  var re = new RegExp(process.env.REGEX)
+  return re.test(input)
+}
+
 async function fetchAllMessages() {
   const channel = client.channels.cache.get(process.env.CHANNEL_ID);
   var messages = [];
@@ -33,7 +38,7 @@ async function fetchAllMessages() {
       })
   }
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (/^[a-zA-Z0-9].*(er|re|or)\?[ ]?I .* know her!/.test(messages[i].content) &&
+    if (checkRegex(messages[i].content) &&
       jokesList[messages[i].content.toLowerCase()] == undefined) {
       // if the message is a joke, add it to the dictionary and assign the user that
       // originally sent that message as the value for a quicker value
@@ -52,7 +57,7 @@ async function fetchAllMessages() {
 
 client.once("ready", () => {
   console.log("BOT IS ONLINE"); //message when bot is online
-  client.user.setPresence({ activities: [{ name: 'Your mom ;)' }], status: 'online' });
+  client.user.setPresence({ activities: [{ name: process.env.ACTIVITIES }], status: process.env.STATUS });
   fetchAllMessages()
 })
 
@@ -71,7 +76,7 @@ client.on("messageCreate", function(message) {
     message.channel.send(response);
   } else {
     try {
-      if (/^[a-zA-Z0-9].*(er|re|or)\?[ ]?I .* know her!/.test(message.content)) {
+      if (checkRegex(message.content)) {
         // if it is in the correct format, respond and increment the count
         if (jokesList[message.content.toLowerCase()] == undefined) {
           // if we haven't seen this joke before, do the work
