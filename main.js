@@ -44,11 +44,7 @@ async function fetchAllMessages() {
       // originally sent that message as the value for a quicker value
       jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
 
-      if (userList[messages[i].author.username] == undefined) {
-        userList[messages[i].author.username] = 1
-      } else {
-        userList[messages[i].author.username] += 1
-      }
+      userList[messages[i].author.username] = userList[messages[i].author.username] ? userList[messages[i].author.username] + 1 : 1
     }
   }
   console.log(userList)
