@@ -16,12 +16,10 @@ function checkRegex(input) {
   return re.test(input)
 }
 
-async function checkRealWord(word) {
+async function checkRealWord(message) {
+  let word = message.split("?")[0];
   let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-  if (res.status == 404) {
-    return false
-  }
-  return true
+  return res.status == 200
 }
 
 async function fetchAllMessages() {
@@ -38,8 +36,8 @@ async function fetchAllMessages() {
       .fetch({ limit: 100, before: message.id })
       .then(messagePage => {
         messagePage.forEach(msg => {
-          messages.push(msg)
         });
+        messages.push(msg)
 
         // Update our message pointer to be last message in page of messages
         message = 0 < messagePage.size ? messagePage.at(messagePage.size - 1) : null;
@@ -47,7 +45,8 @@ async function fetchAllMessages() {
   }
   for (let i = messages.length - 1; i >= 0; i--) {
     if (checkRegex(messages[i].content) &&
-      jokesList[messages[i].content.toLowerCase()] == undefined) {
+      jokesList[messages[i].content.toLowerCase()] == undefined &&
+      checkRealWord(message[i].content)) {
       // if the message is a joke, add it to the dictionary and assign the user that
       // originally sent that message as the value for a quicker value
       jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
