@@ -16,6 +16,14 @@ function checkRegex(input) {
   return re.test(input)
 }
 
+async function checkRealWord(word) {
+  let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+  if (res.status == 404) {
+    return false
+  }
+  return true
+}
+
 async function fetchAllMessages() {
   const channel = client.channels.cache.get(process.env.CHANNEL_ID);
   var messages = [];
@@ -80,9 +88,11 @@ client.on("messageCreate", function(message) {
         // if it is in the correct format, respond and increment the count
         if (jokesList[message.content.toLowerCase()] == undefined) {
           // if we haven't seen this joke before, do the work
-          jokesList[message.content.toLowerCase()] = message.author.username
-          message.channel.send("Good one " + message.author.username + "!");
-          userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
+          if (checkRealWord(message.content.toLowerCase())) {
+            jokesList[message.content.toLowerCase()] = message.author.username
+            message.channel.send("Good one " + message.author.username + "!");
+            userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
+          }
         } else {
           message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase()]}'s joke like that! For shame -_-`);
         }
