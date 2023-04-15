@@ -10,3 +10,6 @@ docker:
 down:
 	docker stop discord
 	docker rm discord
+
+logs:
+	docker logs discord
