@@ -16,6 +16,12 @@ function checkRegex(input) {
   return re.test(input)
 }
 
+async function checkRealWord(message) {
+  let word = message.split("?")[0];
+  let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+  return res.status == 200
+}
+
 async function fetchAllMessages() {
   const channel = client.channels.cache.get(process.env.CHANNEL_ID);
   var messages = [];
@@ -30,8 +36,8 @@ async function fetchAllMessages() {
       .fetch({ limit: 100, before: message.id })
       .then(messagePage => {
         messagePage.forEach(msg => {
-          messages.push(msg)
         });
+        messages.push(msg)
 
         // Update our message pointer to be last message in page of messages
         message = 0 < messagePage.size ? messagePage.at(messagePage.size - 1) : null;
@@ -39,7 +45,8 @@ async function fetchAllMessages() {
   }
   for (let i = messages.length - 1; i >= 0; i--) {
     if (checkRegex(messages[i].content) &&
-      jokesList[messages[i].content.toLowerCase()] == undefined) {
+      jokesList[messages[i].content.toLowerCase()] == undefined &&
+      checkRealWord(message[i].content)) {
       // if the message is a joke, add it to the dictionary and assign the user that
       // originally sent that message as the value for a quicker value
       jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
@@ -76,9 +83,11 @@ client.on("messageCreate", function(message) {
         // if it is in the correct format, respond and increment the count
         if (jokesList[message.content.toLowerCase()] == undefined) {
           // if we haven't seen this joke before, do the work
-          jokesList[message.content.toLowerCase()] = message.author.username
-          message.channel.send("Good one " + message.author.username + "!");
-          userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
+          if (checkRealWord(message.content.toLowerCase())) {
+            jokesList[message.content.toLowerCase()] = message.author.username
+            message.channel.send("Good one " + message.author.username + "!");
+            userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
+          }
         } else {
           message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase()]}'s joke like that! For shame -_-`);
         }
