@@ -51,12 +51,12 @@ async function fetchAllMessages() {
   for (let i = messages.length - 1; i >= 0; i--) {
 
     if (checkRegex(messages[i].content) &&
-      jokesList[messages[i].content.toLowerCase()] == undefined ) {
+      jokesList[messages[i].content.toLowerCase().split("?")[0]] == undefined ) {
       await checkRealWord(messages[i].content).then(function (data) {
         if (data) {
           // if the message is a joke, add it to the dictionary and assign the user that
           // originally sent that message as the value for a quicker value
-          jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
+          jokesList[messages[i].content.toLowerCase().split("?")[0]] = messages[i].author.username
 
           userList[messages[i].author.username] = userList[messages[i].author.username] ? userList[messages[i].author.username] + 1 : 1
 
@@ -80,6 +80,7 @@ client.on("messageCreate", async function(message) {
     // if we sent the message, don't respond to it
     return
   }
+
   if (message.content.substring(0, 6) === "!count") {
     //reply if message has "!" as first character
     let response = "Here are the counts!\n"
@@ -87,17 +88,38 @@ client.on("messageCreate", async function(message) {
       response += `${key}: ${userList[key]}\n`;
     }
     message.channel.send(response);
-  } else {
+  } else if (message.content.substring(0, 7) === "!recall") {
+    let response = ""
+    let username = ""
+
+    let splitMsg = message.content.split(" ")
+    for (let i = 1; i < splitMsg.length; i++) {
+      username = username.concat(splitMsg[i], " ")
+    }
+
+    username = username.trim()
+    for (const key in jokesList) {
+      if (jokesList[key] == username) {
+        response += `${key}\n`;
+      }
+    }
+    if (response.length == 0) {
+      message.channel.send(`Can't find messages from ${username} :/`);
+    } else {
+      message.channel.send(`Heres what I have for ${username}!\n${response}`);
+    }
+
+  } else{
     try {
       if (checkRegex(message.content)) {
         // if it is in the correct format, respond and increment the count
-        if (jokesList[message.content.toLowerCase()] == undefined) {
+        if (jokesList[message.content.toLowerCase().split("?")[0]] == undefined) {
           // if we haven't seen this joke before, do the work
           await checkRealWord(message.content).then(function (isWord) {
             if (isWord) {
               // if the message is a joke, add it to the dictionary and assign the user that
               // originally sent that message as the value for a quicker value
-              jokesList[message.content.toLowerCase()] = message.author.username
+              jokesList[message.content.toLowerCase().split("?")[0]] = message.author.username
               userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
               message.channel.send("Good one " + message.author.username + "!");
             } else {
@@ -105,7 +127,7 @@ client.on("messageCreate", async function(message) {
             }
           })
         } else {
-          message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase()]}'s joke like that! For shame -_-`);
+          message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase().split("?")[0]]}'s joke like that! For shame -_-`);
         }
       }
     } catch (error) {
