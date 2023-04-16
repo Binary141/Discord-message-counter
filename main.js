@@ -17,9 +17,14 @@ function checkRegex(input) {
 }
 
 async function checkRealWord(message) {
-  let word = message.split("?")[0];
-  let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-  return res.status == 200
+  return new Promise( (resolve, reject) => {
+      let word = message.split("?")[0];
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`).then(function(response){
+        response.json().then(function (data) {
+          resolve(data.title != "No Definitions Found");
+        });
+      });
+  });
 }
 
 async function fetchAllMessages() {
@@ -36,22 +41,28 @@ async function fetchAllMessages() {
       .fetch({ limit: 100, before: message.id })
       .then(messagePage => {
         messagePage.forEach(msg => {
+          messages.push(msg)
         });
-        messages.push(msg)
 
         // Update our message pointer to be last message in page of messages
         message = 0 < messagePage.size ? messagePage.at(messagePage.size - 1) : null;
       })
   }
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (checkRegex(messages[i].content) &&
-      jokesList[messages[i].content.toLowerCase()] == undefined &&
-      checkRealWord(message[i].content)) {
-      // if the message is a joke, add it to the dictionary and assign the user that
-      // originally sent that message as the value for a quicker value
-      jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
 
-      userList[messages[i].author.username] = userList[messages[i].author.username] ? userList[messages[i].author.username] + 1 : 1
+    if (checkRegex(messages[i].content) &&
+      jokesList[messages[i].content.toLowerCase()] == undefined ) {
+      await checkRealWord(messages[i].content).then(function (data) {
+        if (data) {
+          // if the message is a joke, add it to the dictionary and assign the user that
+          // originally sent that message as the value for a quicker value
+          jokesList[messages[i].content.toLowerCase()] = messages[i].author.username
+
+          userList[messages[i].author.username] = userList[messages[i].author.username] ? userList[messages[i].author.username] + 1 : 1
+
+        }
+      })
+
     }
   }
   console.log(userList)
@@ -64,8 +75,7 @@ client.once("ready", () => {
   fetchAllMessages()
 })
 
-client.on("messageCreate", function(message) {
-  console.log("Message: ", message.content);
+client.on("messageCreate", async function(message) {
   if (message.author.username === client.user.username) {
     // if we sent the message, don't respond to it
     return
@@ -83,11 +93,17 @@ client.on("messageCreate", function(message) {
         // if it is in the correct format, respond and increment the count
         if (jokesList[message.content.toLowerCase()] == undefined) {
           // if we haven't seen this joke before, do the work
-          if (checkRealWord(message.content.toLowerCase())) {
-            jokesList[message.content.toLowerCase()] = message.author.username
-            message.channel.send("Good one " + message.author.username + "!");
-            userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
-          }
+          await checkRealWord(message.content).then(function (isWord) {
+            if (isWord) {
+              // if the message is a joke, add it to the dictionary and assign the user that
+              // originally sent that message as the value for a quicker value
+              jokesList[message.content.toLowerCase()] = message.author.username
+              userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
+              message.channel.send("Good one " + message.author.username + "!");
+            } else {
+              message.channel.send(`Bruh. This is not a word -_-`);
+            }
+          })
         } else {
           message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase()]}'s joke like that! For shame -_-`);
         }
