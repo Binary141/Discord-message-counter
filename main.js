@@ -113,13 +113,14 @@ client.on("messageCreate", async function(message) {
     try {
       if (checkRegex(message.content)) {
         // if it is in the correct format, respond and increment the count
-        if (jokesList[message.content.toLowerCase().split("?")[0]] == undefined) {
+        let joke = message.content.toLowerCase().split("?")[0]
+        if (jokesList[joke] == undefined) {
           // if we haven't seen this joke before, do the work
           await checkRealWord(message.content).then(function (isWord) {
             if (isWord) {
               // if the message is a joke, add it to the dictionary and assign the user that
               // originally sent that message as the value for a quicker value
-              jokesList[message.content.toLowerCase().split("?")[0]] = message.author.username
+              jokesList[joke] = message.author.username
               userList[message.author.username] = userList[message.author.username] ? userList[message.author.username] + 1 : 1
               message.channel.send("Good one " + message.author.username + "!");
             } else {
@@ -127,7 +128,11 @@ client.on("messageCreate", async function(message) {
             }
           })
         } else {
-          message.channel.send(`I can't believe you would copy ${jokesList[message.content.toLowerCase().split("?")[0]]}'s joke like that! For shame -_-`);
+          if (jokesList[joke] != message.author.username) {
+            message.channel.send(`I can't believe you would copy ${jokesList[joke]}'s joke like that! For shame -_-`);
+          } else {
+            message.channel.send(`I can't believe you would try and reuse your own joke! Much sadness -_-`);
+          }
         }
       }
     } catch (error) {
