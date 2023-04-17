@@ -1,3 +1,5 @@
+let mysql = require('mysql');
+var SqlString = require('sqlstring');
 require("dotenv").config(); //to start process from .env file
 const { Client, GatewayIntentBits } = require('discord.js');
 const client = new Client({
@@ -10,6 +12,39 @@ const client = new Client({
 });
 let userList = {}
 let jokesList = {}
+let connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: 'password',
+    database: 'discord'
+});
+
+connection.connect(function(err) {
+  if (err) {
+    connection.query("create database if not exists discord", function(err, result) {
+      if (err) throw err;
+    });
+    connection.query("create table if not exists jokes (user varchar(255), joke varchar(255))", function(err, result) {
+      if (err) throw err;
+    });
+    connection.query("create table if not exists users (user varchar(255), count varchar(255))", function(err, result) {
+      if (err) throw err;
+    });
+      return console.error('error: ' + err.message);
+  }
+
+  connection.query("create database if not exists discord", function(err, result) {
+  if (err) throw err;
+  });
+  connection.query("create table if not exists jokes (user varchar(255), joke varchar(255))", function(err, result) {
+    if (err) throw err;
+  });
+  connection.query("create table if not exists users (user varchar(255), count varchar(255))", function(err, result) {
+    if (err) throw err;
+  });
+
+  console.log('Connected to the MySQL server.');
+});
 
 function checkRegex(input) {
   var re = new RegExp(process.env.REGEX)
@@ -27,43 +62,79 @@ async function checkRealWord(message) {
   });
 }
 
+function isValid(str){
+    if(typeof(str)!=='string'){
+        return false;
+    }
+    for(var i=0;i<str.length;i++){
+        if(str.charCodeAt(i)>127){
+            return false;
+        }
+    }
+    return true;
+}
+
+async function doesNotExist(joke) {
+  return new Promise( (resolve, reject) => {
+    connection.query(`select * from jokes where joke = ${SqlString.escape(joke)}`, function(err, result) {
+      if (err) throw err;
+      resolve(result.length == 0)
+    });
+  });
+}
+
 async function fetchAllMessages() {
   const channel = client.channels.cache.get(process.env.CHANNEL_ID);
   var messages = [];
 
   // Create message pointer
-  let message = await channel.messages
-    .fetch({ limit: 1 })
-    .then(messagePage => (messagePage.size === 1 ? messagePage.at(0) : null));
-
-  while (message) {
+  let message
+  if (process.env.LASTMSG == undefined || process.env.LASTMSG == 0) {
+    message = await channel.messages
+      .fetch({ limit: 1 })
+      .then(messagePage => (messagePage.size === 1 ? messagePage.at(0) : null));
+  } else {
     await channel.messages
-      .fetch({ limit: 100, before: message.id })
-      .then(messagePage => {
-        messagePage.forEach(msg => {
-          messages.push(msg)
-        });
-
-        // Update our message pointer to be last message in page of messages
-        message = 0 < messagePage.size ? messagePage.at(messagePage.size - 1) : null;
-      })
+      .fetch(process.env.LASTMSG)
+      .then(messageThing => {
+        message = messageThing
+      });
   }
-  for (let i = messages.length - 1; i >= 0; i--) {
 
-    if (checkRegex(messages[i].content) &&
-      jokesList[messages[i].content.toLowerCase().split("?")[0]] == undefined ) {
-      await checkRealWord(messages[i].content).then(function (data) {
-        if (data) {
-          // if the message is a joke, add it to the dictionary and assign the user that
-          // originally sent that message as the value for a quicker value
-          jokesList[messages[i].content.toLowerCase().split("?")[0]] = messages[i].author.username
-
-          userList[messages[i].author.username] = userList[messages[i].author.username] ? userList[messages[i].author.username] + 1 : 1
-
-        }
-      })
-
-    }
+  try {
+    while (message) {
+      await channel.messages
+        .fetch({ limit: 100, before: message.id })
+        .then(messagePage => {
+          messagePage.forEach(msg => {
+            if (msg.author.username === client.user.username) {
+              // if we sent the message, don't respond to it
+            } else {
+              let username = msg.author.username
+              let joke = msg.content.toLowerCase().split("?")[0]
+              if (isValid(joke) && checkRegex(msg.content)) {
+                doesNotExist(joke).then(notExists => {
+                  if (notExists) {
+                    checkRealWord(msg.content).then(function (data) {
+                      if (data) {
+                        connection.query(`insert into jokes (user, joke) values (${SqlString.escape(username)}, ${SqlString.escape(joke)})`, function(err, result) {
+                          if (err) throw err;
+                    });
+                      }
+                    })
+                  }
+                })
+              }
+            }
+         })
+          // Update our message pointer to be last message in page of messages
+          message = 0 < messagePage.size ? messagePage.at(messagePage.size - 1) : null;
+         })
+      console.log(message.id)
+      }
+  } catch (error) {
+    console.log(error)
+    console.log("Uh oh, that be an error")
   }
   console.log(userList)
   console.log(jokesList)
@@ -72,7 +143,7 @@ async function fetchAllMessages() {
 client.once("ready", () => {
   console.log("BOT IS ONLINE"); //message when bot is online
   client.user.setPresence({ activities: [{ name: process.env.ACTIVITIES }], status: process.env.STATUS });
-  fetchAllMessages()
+  // fetchAllMessages()
 })
 
 client.on("messageCreate", async function(message) {
@@ -84,10 +155,14 @@ client.on("messageCreate", async function(message) {
   if (message.content.substring(0, 6) === "!count") {
     //reply if message has "!" as first character
     let response = "Here are the counts!\n"
-    for (const key in userList) {
-      response += `${key}: ${userList[key]}\n`;
-    }
-    message.channel.send(response);
+    connection.query(`select user, count(1) as "count" from jokes group by user`, function(err, result) {
+      if (err) throw err;
+      for (let i = 0; i < result.length; i++) {
+        console.log(result[i])
+        response += `${result[i].user}: ${result[i].count}\n`;
+      }
+      message.channel.send(response);
+  });
   } else if (message.content.substring(0, 7) === "!recall") {
     let response = ""
     let username = ""
